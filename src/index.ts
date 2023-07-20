@@ -1,3 +1,5 @@
+import "./index.css";
+
 type ScreenSize = {
   width: number;
   height: number;
@@ -7,7 +9,6 @@ type DrawHandler = {
   canvas: HTMLCanvasElement;
   canvasCtx: CanvasRenderingContext2D;
   analyserNode: AnalyserNode;
-  dataArray: Uint8Array;
   bufferLength: number;
 };
 
@@ -51,22 +52,22 @@ function initializeCanvas({ width, height }: ScreenSize): HTMLCanvasElement {
   return canvas;
 }
 
-function draw(params: DrawHandler) {
-  const { canvas, canvasCtx, analyserNode, dataArray, bufferLength } = params;
+function drawWaveform(params: DrawHandler, dataArray: Float32Array) {
+  const { canvas, canvasCtx, analyserNode, bufferLength } = params;
 
-  analyserNode.getByteTimeDomainData(dataArray);
+  analyserNode.getFloatTimeDomainData(dataArray);
 
   canvasCtx.clearRect(0, 0, screenSize.width, screenSize.height);
   canvas.width = canvas.width;
-  canvasCtx.lineWidth = 2;
+  canvasCtx.lineWidth = 4;
   canvasCtx.strokeStyle = "rgb(255, 255, 255)";
 
   const sliceWidth = screenSize.width / bufferLength;
   let x = 0;
 
   for (let i = 0; i < bufferLength; i++) {
-    const v = dataArray[i] / 128.0;
-    const y = v * (screenSize.height / 2);
+    const v = dataArray[i];
+    const y = (v * screenSize.height) / 2 + screenSize.height / 2;
 
     if (i === 0) {
       canvasCtx.moveTo(x, y);
@@ -81,7 +82,39 @@ function draw(params: DrawHandler) {
   canvasCtx.stroke();
 
   requestAnimationFrame(() => {
-    draw(params);
+    drawWaveform(params, dataArray);
+  });
+}
+
+function drawBars(params: DrawHandler, dataArray: Uint8Array) {
+  const { canvas, canvasCtx, analyserNode, bufferLength } = params;
+
+  analyserNode.getByteFrequencyData(dataArray);
+
+  canvasCtx.clearRect(0, 0, screenSize.width, screenSize.height);
+  canvas.width = canvas.width;
+  canvasCtx.lineWidth = 4;
+  canvasCtx.strokeStyle = "rgb(255, 255, 255)";
+
+  const barWidth = (screenSize.width / bufferLength) * 2.5;
+  let barHeight = 0;
+  let x = 0;
+
+  for (let i = 0; i < bufferLength; i++) {
+    barHeight = dataArray[i];
+
+    canvasCtx.fillStyle = `rgb(${Math.round(
+      Math.sin(barHeight) * 255,
+    )}, ${Math.round(Math.cos(barHeight) * 255)}, ${Math.round(
+      Math.tan(barHeight) * 255,
+    )})`;
+    canvasCtx.fillRect(x, screenSize.height - barHeight, barWidth, barHeight);
+
+    x += barWidth + 1;
+  }
+
+  requestAnimationFrame(() => {
+    drawBars(params, dataArray);
   });
 }
 
@@ -128,19 +161,16 @@ async function main() {
 
   analyserNode.fftSize = 2048;
   const bufferLength = analyserNode.frequencyBinCount;
-  const dataArray = new Uint8Array(bufferLength);
-
-  analyserNode.getByteTimeDomainData(dataArray);
+  const dataArray = new Float32Array(bufferLength);
 
   const params: DrawHandler = {
     canvas,
     canvasCtx,
     analyserNode,
-    dataArray,
     bufferLength,
   };
 
-  draw(params);
+  drawWaveform(params, dataArray);
 }
 
 main()

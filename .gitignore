@@ -15,3 +15,4 @@ dist/
 .env.production.local
 .env.local
 .webpack/
+src/img/
